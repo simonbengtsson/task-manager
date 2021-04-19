@@ -29,6 +29,8 @@ class _MainScreenState extends State<MainScreen> {
     Task('Walk the dog', DateTime.now()),
   ];
 
+  List<Day> days = [];
+
   Task? activeTask;
 
   @override
@@ -68,7 +70,7 @@ class _MainScreenState extends State<MainScreen> {
                 style: TextStyle(fontSize: 28),
               ),
               Text(
-                  "${weekdays[DateTime.now().weekday - 1]}, ${DateTime.now().day} April",
+                  "${weekdays[DateTime.now().weekday - 1]}, ${DateTime.now().day} ${months[DateTime.now().month - 1]}",
                   style: TextStyle(color: Colors.grey[600]))
             ]),
           ),
@@ -121,21 +123,29 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget buildCalendar(BuildContext context) {
+  @override
+  initState() {
     var now = DateTime.now();
-    var days = List<Day>.generate(
-        28,
-            (int i) => Day(DateTime.fromMillisecondsSinceEpoch(
-            now.millisecondsSinceEpoch +
-                (i + 1) * 24 * 3600 * 1000 -
-                3600 * 1000 * 4)));
+    days = List<Day>.generate(28, (int i) {
+      var timestamp = now.millisecondsSinceEpoch +
+          (i + 1) * 24 * 3600 * 1000 -
+          3600 * 1000 * 4;
+      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      var day = Day(date);
+      if (i == 0) {
+        day.tasks.add(Task("Peach tickets", DateTime.now()));
+      }
+      return day;
+    });
+    super.initState();
+  }
 
+  Widget buildCalendar(BuildContext context) {
     return Container(
       height: 240,
-      child: ListView(scrollDirection: Axis.horizontal, children: [
-        for (var day in days)
-          buildCalendarDay(day)
-      ]),
+      child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [for (var day in days) buildCalendarDay(day)]),
     );
   }
 
@@ -146,7 +156,39 @@ class _MainScreenState extends State<MainScreen> {
         color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
         border: Border.all(color: Colors.grey[100]!),
       ),
-      child: Center(child: Text(weekdays[day.date.weekday - 1])),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                "${weekdays[day.date.weekday - 1]} ${day.date.day}",
+                style: TextStyle(
+                    fontWeight: FontWeight.w500, color: Colors.grey[500]),
+              ),
+            ),
+            buildCalendarDayTaskList(day),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildCalendarDayTaskList(Day day) {
+    return Column(
+      children: [
+        for (var task in day.tasks) Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 5.0),
+              child: Icon(Icons.radio_button_unchecked, size: 14, color: Colors.grey[600],),
+            ),
+            Text(task.text),
+          ],
+        ),
+      ],
     );
   }
 
