@@ -12,6 +12,10 @@ class Task {
   DateTime? completedAt;
   DateTime? date;
 
+  bool get done {
+    return completedAt != null;
+  }
+
   Task(this.text, this.createdAt);
 
   factory Task.create() {
@@ -59,8 +63,6 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
 
   Task? activeTask;
-
-  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -132,10 +134,19 @@ class _MyHomePageState extends State<MyHomePage> {
                   color: Colors.grey[400]),
               onPressed: () {
                 setState(() {
-                  todayTasks[index].completedAt =
-                      todayTasks[index].completedAt == null
-                          ? DateTime.now()
-                          : null;
+                  var doneIndex = todayTasks.indexWhere((element) => element.done);
+                  if (task.done) {
+                    var firstCompletedIndex = doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
+                    task.completedAt = null;
+                    var index = todayTasks.indexOf(task);
+                    var item = todayTasks.removeAt(index);
+                    todayTasks.insert(firstCompletedIndex, item);
+                  } else {
+                    var firstCompletedIndex = doneIndex < 0 ? todayTasks.length - 1 : doneIndex - 1;
+                    task.completedAt = DateTime.now();
+                    todayTasks.remove(task);
+                    todayTasks.insert(firstCompletedIndex, task);
+                  }
                 });
               },
             )),
@@ -156,7 +167,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
     var taskList = ReorderableListView(
       padding: EdgeInsets.symmetric(vertical: 20),
-      scrollController: _scrollController,
       onReorder: (int oldIndex, int newIndex) {
         setState(() {
           if (oldIndex < newIndex) {
@@ -193,19 +203,28 @@ class _MyHomePageState extends State<MyHomePage> {
             IconButton(
               icon: Icon(Icons.add),
               onPressed: () {
-                _scrollController.animateTo(
-                  // Without + 100 it didn't scroll all the way to the bottom
-                  // The + 100 also added a nice bounce affect
-                  _scrollController.position.maxScrollExtent + 100,
-                  duration: Duration(milliseconds: 100),
-                  curve: Curves.easeIn,
-                );
                 this.setState(() {
                   var task = Task.create();
                   activeTask = task;
-                  todayTasks.add(task);
+                  todayTasks.insert(0, task);
                 });
               },
+            ),
+            PopupMenuButton(
+              icon: Icon(Icons.more_horiz),
+              onSelected: (value) {
+                if (value == "settings") {
+                  print("Settings clicked");
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                var item = PopupMenuItem<String>(
+                  value: "settings",
+                  child: Text("Settings"),
+                );
+                return [item];
+              },
+
             ),
           ],
         ),
