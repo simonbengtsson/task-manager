@@ -131,18 +131,22 @@ class _MainScreenState extends State<MainScreen> {
                 3600 * 1000 * 4)));
 
     return Container(
-      height: 200,
+      height: 240,
       child: ListView(scrollDirection: Axis.horizontal, children: [
         for (var day in days)
-          Container(
-            width: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
-              border: Border.all(color: Colors.grey[100]!),
-            ),
-            child: Center(child: Text(weekdays[day.date.weekday - 1])),
-          )
+          buildCalendarDay(day)
       ]),
+    );
+  }
+
+  Widget buildCalendarDay(Day day) {
+    return Container(
+      width: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
+        border: Border.all(color: Colors.grey[100]!),
+      ),
+      child: Center(child: Text(weekdays[day.date.weekday - 1])),
     );
   }
 
