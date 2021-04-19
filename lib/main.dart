@@ -58,8 +58,9 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final List<Task> todayTasks = [
-    Task('Next steps peach', DateTime.now()),
-    Task('Nikhil code review', DateTime.now()),
+    Task('Buy milk', DateTime.now()),
+    Task('Run 5km', DateTime.now()),
+    Task('Walk the dog', DateTime.now()),
   ];
 
   Task? activeTask;
