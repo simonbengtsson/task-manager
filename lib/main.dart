@@ -105,22 +105,28 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget buildTaskList(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.symmetric(vertical: 20),
-      /*onReorder: (int oldIndex, int newIndex) {
-        setState(() {
-          if (oldIndex < newIndex) {
-            newIndex -= 1;
-          }
-          var item = todayTasks.removeAt(oldIndex);
-          todayTasks.insert(newIndex, item);
-        });
-      },*/
-      children: [
-        for (var entry in todayTasks.asMap().entries)
-          buildTaskRow(context, entry.key, entry.value)
-      ],
-    );
+    return DragTarget<Task>(onAcceptWithDetails: (details) {
+      setState(() {
+        todayTasks.add(details.data);
+      });
+    }, builder: (context, candidateItems, rejectedItems) {
+      return ListView(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        /*onReorder: (int oldIndex, int newIndex) {
+          setState(() {
+            if (oldIndex < newIndex) {
+              newIndex -= 1;
+            }
+            var item = todayTasks.removeAt(oldIndex);
+            todayTasks.insert(newIndex, item);
+          });
+        },*/
+        children: [
+          for (var entry in todayTasks.asMap().entries)
+            buildTaskRow(context, entry.key, entry.value)
+        ],
+      );
+    });
   }
 
   @override
@@ -150,9 +156,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget buildCalendarDay(Day day) {
-    return DragTarget<Task>(onAccept: (task) {
+    return DragTarget<Task>(onAcceptWithDetails: (details) {
       setState(() {
-        day.tasks.add(task);
+        day.tasks.add(details.data);
       });
     }, builder: (context, candidateItems, rejectedItems) {
       return Container(
@@ -186,18 +192,52 @@ class _MainScreenState extends State<MainScreen> {
     return Column(
       children: [
         for (var task in day.tasks)
-          Row(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 5.0),
-                child: Icon(
-                  Icons.radio_button_unchecked,
-                  size: 14,
-                  color: Colors.grey[600],
+          LongPressDraggable(
+            feedback: Row(children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(minWidth: 300),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.3),
+                        blurRadius: 7,
+                      ),
+                    ],
+                  ),
+                  padding: EdgeInsets.all(10),
+                  child: Text(task.text,
+                      style: TextStyle(
+                          fontSize: 15,
+                          color:
+                          task.completedAt == null ? Colors.black : Colors.grey,
+                          decoration: task.completedAt == null
+                              ? TextDecoration.none
+                              : TextDecoration.lineThrough)),
                 ),
               ),
-              Text(task.text),
-            ],
+            ]),
+            data: task,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragCompleted: () {
+              setState(() {
+                day.tasks.remove(task);
+              });
+            },
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 5.0),
+                  child: Icon(
+                    Icons.radio_button_unchecked,
+                    size: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                Text(task.text),
+              ],
+            ),
           ),
       ],
     );
@@ -265,8 +305,9 @@ class _MainScreenState extends State<MainScreen> {
             padding: EdgeInsets.all(10),
             child: Text(task.text,
                 style: TextStyle(
-                  fontSize: 15,
-                    color: task.completedAt == null ? Colors.black : Colors.grey,
+                    fontSize: 15,
+                    color:
+                        task.completedAt == null ? Colors.black : Colors.grey,
                     decoration: task.completedAt == null
                         ? TextDecoration.none
                         : TextDecoration.lineThrough)),
