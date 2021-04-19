@@ -1,62 +1,28 @@
 import 'package:flutter/material.dart';
 
-var weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+import 'models.dart';
 
 void main() {
   runApp(MyApp());
-}
-
-class Task {
-  String text;
-  DateTime createdAt;
-  DateTime? completedAt;
-  DateTime? date;
-
-  bool get done {
-    return completedAt != null;
-  }
-
-  Task(this.text, this.createdAt);
-
-  factory Task.create() {
-    return Task('', DateTime.now());
-  }
-
-  factory Task.fromJson(Map<String, Object> json) {
-    var name = json["name"] as String;
-    var createdAt = json["createdAt"] as DateTime;
-    return Task(name, createdAt);
-  }
-}
-
-class Day {
-  List<Task> tasks = [];
-  DateTime date;
-
-  Day(this.date);
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Task Manager',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: MyHomePage(),
+      home: MainScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key}) : super(key: key);
+class MainScreen extends StatefulWidget {
+  MainScreen({Key? key}) : super(key: key);
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _MainScreenState createState() => _MainScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MainScreenState extends State<MainScreen> {
   final List<Task> todayTasks = [
     Task('Buy milk', DateTime.now()),
     Task('Run 5km', DateTime.now()),
@@ -66,8 +32,118 @@ class _MyHomePageState extends State<MyHomePage> {
   Task? activeTask;
 
   @override
-  void initState() {
-    super.initState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildHeader(context),
+                  Expanded(child: buildTaskList(context)),
+                ],
+              ),
+            ),
+          ),
+          buildCalendar(context),
+        ],
+      ),
+    );
+  }
+
+  Widget buildHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: 30),
+      child: Row(
+        children: [
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                'Today',
+                style: TextStyle(fontSize: 28),
+              ),
+              Text(
+                  "${weekdays[DateTime.now().weekday - 1]}, ${DateTime.now().day} April",
+                  style: TextStyle(color: Colors.grey[600]))
+            ]),
+          ),
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () {
+              this.setState(() {
+                var task = Task.create();
+                activeTask = task;
+                todayTasks.insert(0, task);
+              });
+            },
+          ),
+          PopupMenuButton(
+            icon: Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == "settings") {
+                print("Settings clicked");
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              var item = PopupMenuItem<String>(
+                value: "settings",
+                child: Text("Settings"),
+              );
+              return [item];
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildTaskList(BuildContext context) {
+    return ReorderableListView(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      onReorder: (int oldIndex, int newIndex) {
+        setState(() {
+          if (oldIndex < newIndex) {
+            newIndex -= 1;
+          }
+          var item = todayTasks.removeAt(oldIndex);
+          todayTasks.insert(newIndex, item);
+        });
+      },
+      children: [
+        for (var entry in todayTasks.asMap().entries)
+          buildTaskRow(context, entry.key, entry.value)
+      ],
+    );
+  }
+
+  Widget buildCalendar(BuildContext context) {
+    var now = DateTime.now();
+    var days = List<Day>.generate(
+        28,
+            (int i) => Day(DateTime.fromMillisecondsSinceEpoch(
+            now.millisecondsSinceEpoch +
+                (i + 1) * 24 * 3600 * 1000 -
+                3600 * 1000 * 4)));
+
+    return Container(
+      height: 200,
+      child: ListView(scrollDirection: Axis.horizontal, children: [
+        for (var day in days)
+          Container(
+            width: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
+              border: Border.all(color: Colors.grey[100]!),
+            ),
+            child: Center(child: Text(weekdays[day.date.weekday - 1])),
+          )
+      ]),
+    );
   }
 
   Widget buildTaskRow(BuildContext context, int index, Task task) {
@@ -135,15 +211,18 @@ class _MyHomePageState extends State<MyHomePage> {
                   color: Colors.grey[400]),
               onPressed: () {
                 setState(() {
-                  var doneIndex = todayTasks.indexWhere((element) => element.done);
+                  var doneIndex =
+                      todayTasks.indexWhere((element) => element.done);
                   if (task.done) {
-                    var firstCompletedIndex = doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
+                    var firstCompletedIndex =
+                        doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
                     task.completedAt = null;
                     var index = todayTasks.indexOf(task);
                     var item = todayTasks.removeAt(index);
                     todayTasks.insert(firstCompletedIndex, item);
                   } else {
-                    var firstCompletedIndex = doneIndex < 0 ? todayTasks.length - 1 : doneIndex - 1;
+                    var firstCompletedIndex =
+                        doneIndex < 0 ? todayTasks.length - 1 : doneIndex - 1;
                     task.completedAt = DateTime.now();
                     todayTasks.remove(task);
                     todayTasks.insert(firstCompletedIndex, task);
@@ -153,120 +232,6 @@ class _MyHomePageState extends State<MyHomePage> {
             )),
         textField,
       ]),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    var now = DateTime.now();
-    var days = List<Day>.generate(
-        28,
-        (int i) => Day(DateTime.fromMillisecondsSinceEpoch(
-            now.millisecondsSinceEpoch +
-                i * 24 * 3600 * 1000 -
-                3600 * 1000 * 4)));
-
-    var taskList = ReorderableListView(
-      padding: EdgeInsets.symmetric(vertical: 20),
-      onReorder: (int oldIndex, int newIndex) {
-        setState(() {
-          if (oldIndex < newIndex) {
-            newIndex -= 1;
-          }
-          var item = todayTasks.removeAt(oldIndex);
-          todayTasks.insert(newIndex, item);
-        });
-      },
-      children: [
-        for (var entry in todayTasks.asMap().entries)
-          buildTaskRow(context, entry.key, entry.value)
-      ],
-    );
-
-    List<Widget> today = [
-      Padding(
-        padding: EdgeInsets.only(top: 30),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Today',
-                      style: TextStyle(fontSize: 28),
-                    ),
-                    Text(
-                        "${weekdays[DateTime.now().weekday - 1]}, ${DateTime.now().day} April",
-                        style: TextStyle(color: Colors.grey[600]))
-                  ]),
-            ),
-            IconButton(
-              icon: Icon(Icons.add),
-              onPressed: () {
-                this.setState(() {
-                  var task = Task.create();
-                  activeTask = task;
-                  todayTasks.insert(0, task);
-                });
-              },
-            ),
-            PopupMenuButton(
-              icon: Icon(Icons.more_horiz),
-              onSelected: (value) {
-                if (value == "settings") {
-                  print("Settings clicked");
-                }
-              },
-              itemBuilder: (BuildContext context) {
-                var item = PopupMenuItem<String>(
-                  value: "settings",
-                  child: Text("Settings"),
-                );
-                return [item];
-              },
-
-            ),
-          ],
-        ),
-      ),
-      Expanded(child: taskList),
-    ];
-
-    var dayList = ListView(
-      scrollDirection: Axis.horizontal,
-      children: days.map((day) {
-        var color = Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200];
-        return Container(
-          width: 120,
-          decoration: BoxDecoration(
-            color: color,
-            border: Border.all(color: Colors.grey[100]!),
-          ),
-          child: Center(child: Text(weekdays[day.date.weekday - 1])),
-        );
-      }).toList(),
-    );
-
-    return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: today,
-              ),
-            ),
-          ),
-          Container(
-            height: 200,
-            child: dayList,
-          )
-        ],
-      ),
     );
   }
 }
