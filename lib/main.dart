@@ -23,11 +23,10 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  final List<Task> todayTasks = [];
-
+  List<Task> todayTasks = [];
   List<Day> days = [];
-
   Task? activeTask;
+  bool demoMode = false;
 
   @override
   initState() {
@@ -41,19 +40,22 @@ class _MainScreenState extends State<MainScreen> {
       return day;
     });
 
-    todayTasks.add(Task('Buy milk'));
-    todayTasks.add(Task('Run 5km'));
-    todayTasks.add(Task('Walk the dog'));
-
-    var yoga = Task('Yoga');
-    yoga.date = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
-    todayTasks.add(yoga);
+    ValueStore().loadTasks().then((tasks) {
+      setState(() {
+        todayTasks = tasks;
+      });
+    });
 
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Find a better place for this?
+    if (!demoMode) {
+      ValueStore().saveTasks(todayTasks);
+    }
+
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,15 +107,35 @@ class _MainScreenState extends State<MainScreen> {
           ),
           PopupMenuButton(
             icon: Icon(Icons.more_horiz),
-            onSelected: (value) {
-              if (value == "settings") {
-                print("Settings clicked");
+            onSelected: (value) async {
+              var loadedTasks = await ValueStore().loadTasks();
+              if (value == "demo") {
+                setState(() {
+                  demoMode = !demoMode;
+                  if (demoMode) {
+                    todayTasks = [];
+
+                    todayTasks.add(Task('Buy milk'));
+                    todayTasks.add(Task('Run 5km'));
+                    todayTasks.add(Task('Walk the dog'));
+
+                    var food = Task('Food Conference');
+                    food.date = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch - 48 * 3600 * 1000);
+                    todayTasks.add(food);
+
+                    var yoga = Task('Yoga');
+                    yoga.date = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
+                    todayTasks.add(yoga);
+                  } else {
+                    todayTasks = loadedTasks;
+                  }
+                });
               }
             },
             itemBuilder: (BuildContext context) {
               var item = PopupMenuItem<String>(
-                value: "settings",
-                child: Text("Settings"),
+                value: "demo",
+                child: Text(demoMode ? 'Turn off Demo' : "Switch to Demo"),
               );
               return [item];
             },
@@ -142,7 +164,11 @@ class _MainScreenState extends State<MainScreen> {
           });
         },*/
         children: [
-          for (var entry in todayTasks.where((element) => element.date == null).toList().asMap().entries)
+          for (var entry in todayTasks.where((element) {
+            var date = element.date;
+            if (date == null) return true;
+            return Day(date).daySince1970 <= Day(DateTime.now()).daySince1970;
+          }).toList().asMap().entries)
             buildTaskRow(context, entry.key, entry.value)
         ],
       );
