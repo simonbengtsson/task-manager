@@ -1,7 +1,6 @@
 
 class Task {
   String text;
-  DateTime createdAt;
   DateTime? completedAt;
   DateTime? date;
 
@@ -9,24 +8,26 @@ class Task {
     return completedAt != null;
   }
 
-  Task(this.text, this.createdAt);
+  Task(this.text);
 
   factory Task.create() {
-    return Task('', DateTime.now());
+    return Task('');
   }
 
   factory Task.fromJson(Map<String, Object> json) {
     var name = json["name"] as String;
-    var createdAt = json["createdAt"] as DateTime;
-    return Task(name, createdAt);
+    return Task(name);
   }
 }
 
 class Day {
-  List<Task> tasks = [];
   DateTime date;
 
   Day(this.date);
+
+  int get daySince1970 {
+    return (date.millisecondsSinceEpoch / 1000 / 3600 / 24).floor();
+  }
 }
 
 var weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

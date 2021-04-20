@@ -23,15 +23,34 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  final List<Task> todayTasks = [
-    Task('Buy milk', DateTime.now()),
-    Task('Run 5km', DateTime.now()),
-    Task('Walk the dog', DateTime.now()),
-  ];
+  final List<Task> todayTasks = [];
 
   List<Day> days = [];
 
   Task? activeTask;
+
+  @override
+  initState() {
+    var now = DateTime.now();
+    days = List<Day>.generate(5, (int i) {
+      var timestamp = now.millisecondsSinceEpoch +
+          (i + 1) * 24 * 3600 * 1000 -
+          3600 * 1000 * 4;
+      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      var day = Day(date);
+      return day;
+    });
+
+    todayTasks.add(Task('Buy milk'));
+    todayTasks.add(Task('Run 5km'));
+    todayTasks.add(Task('Walk the dog'));
+
+    var yoga = Task('Yoga');
+    yoga.date = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
+    todayTasks.add(yoga);
+
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +126,8 @@ class _MainScreenState extends State<MainScreen> {
   Widget buildTaskList(BuildContext context) {
     return DragTarget<Task>(onAcceptWithDetails: (details) {
       setState(() {
-        todayTasks.add(details.data);
+        var index = todayTasks.indexOf(details.data);
+        todayTasks[index].date = null;
       });
     }, builder: (context, candidateItems, rejectedItems) {
       return ListView(
@@ -122,28 +142,11 @@ class _MainScreenState extends State<MainScreen> {
           });
         },*/
         children: [
-          for (var entry in todayTasks.asMap().entries)
+          for (var entry in todayTasks.where((element) => element.date == null).toList().asMap().entries)
             buildTaskRow(context, entry.key, entry.value)
         ],
       );
     });
-  }
-
-  @override
-  initState() {
-    var now = DateTime.now();
-    days = List<Day>.generate(28, (int i) {
-      var timestamp = now.millisecondsSinceEpoch +
-          (i + 1) * 24 * 3600 * 1000 -
-          3600 * 1000 * 4;
-      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      var day = Day(date);
-      if (i == 0) {
-        day.tasks.add(Task("Peach tickets", DateTime.now()));
-      }
-      return day;
-    });
-    super.initState();
   }
 
   Widget buildCalendar(BuildContext context) {
@@ -158,7 +161,9 @@ class _MainScreenState extends State<MainScreen> {
   Widget buildCalendarDay(Day day) {
     return DragTarget<Task>(onAcceptWithDetails: (details) {
       setState(() {
-        day.tasks.add(details.data);
+        var index = todayTasks.indexOf(details.data);
+        todayTasks[index].date = day.date;
+        //details.data.date = day.date;
       });
     }, builder: (context, candidateItems, rejectedItems) {
       return Container(
@@ -189,9 +194,14 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget buildCalendarDayTaskList(Day day) {
+    var dayTasks = todayTasks.where((element) {
+      var date = element.date;
+      if (date == null) return false;
+      return Day(date).daySince1970 == day.daySince1970;
+    });
     return Column(
       children: [
-        for (var task in day.tasks)
+        for (var task in dayTasks)
           LongPressDraggable(
             feedback: Row(children: [
               ConstrainedBox(
@@ -222,7 +232,7 @@ class _MainScreenState extends State<MainScreen> {
             dragAnchorStrategy: pointerDragAnchorStrategy,
             onDragCompleted: () {
               setState(() {
-                day.tasks.remove(task);
+                task.date = null;
               });
             },
             child: Row(
@@ -314,9 +324,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ]),
-      onDragCompleted: () {
-        todayTasks.remove(task);
-      },
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
