@@ -31,7 +31,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   initState() {
     var now = DateTime.now();
-    days = List<Day>.generate(5, (int i) {
+    days = List<Day>.generate(14, (int i) {
       var timestamp = now.millisecondsSinceEpoch +
           (i + 1) * 24 * 3600 * 1000 -
           3600 * 1000 * 4;
