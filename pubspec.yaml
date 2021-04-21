@@ -11,8 +11,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^0.13.1
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.0.5
+  icalendar_parser: ^0.5.1
 
 dev_dependencies:
   flutter_test:
