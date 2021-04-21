@@ -105,7 +105,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "8b765986b64ee8ca86d681610c61757cc8ac7efd"
+      resolved-ref: f194a6975df454e82c05ebebc17447b8d8cbdb8b
       url: "https://github.com/simonbengtsson/icalendar_parser.git"
     source: git
     version: "0.5.1"
