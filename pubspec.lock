@@ -103,9 +103,11 @@ packages:
   icalendar_parser:
     dependency: "direct main"
     description:
-      name: icalendar_parser
-      url: "https://pub.dartlang.org"
-    source: hosted
+      path: "."
+      ref: HEAD
+      resolved-ref: "8b765986b64ee8ca86d681610c61757cc8ac7efd"
+      url: "https://github.com/simonbengtsson/icalendar_parser.git"
+    source: git
     version: "0.5.1"
   js:
     dependency: transitive

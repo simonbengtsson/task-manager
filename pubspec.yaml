@@ -14,7 +14,8 @@ dependencies:
   http: ^0.13.1
   cupertino_icons: ^1.0.2
   shared_preferences: ^2.0.5
-  icalendar_parser: ^0.5.1
+  icalendar_parser:
+    git: https://github.com/simonbengtsson/icalendar_parser.git
 
 dev_dependencies:
   flutter_test:
