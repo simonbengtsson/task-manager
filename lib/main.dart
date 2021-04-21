@@ -143,7 +143,7 @@ class _MainScreenState extends State<MainScreen> {
                 });
               } else if (value == "removeAllTasks") {
                 setState(() {
-                  todayTasks = [];
+                  todayTasks.removeWhere((element) => !element.fromCalendar);
                 });
               } else if (value == "addCalendar") {
                 presentAddCalendarDialog(context);
@@ -155,7 +155,7 @@ class _MainScreenState extends State<MainScreen> {
             itemBuilder: (BuildContext context) {
               var demo = PopupMenuItem<String>(
                 value: "demo",
-                child: Text('Load Demo'),
+                child: Text('Load Demo Tasks'),
               );
               var rmTasks = PopupMenuItem<String>(
                 value: "removeAllTasks",
@@ -325,10 +325,10 @@ class _MainScreenState extends State<MainScreen> {
                 style: TextStyle(
                     fontSize: 15,
                     color:
-                        task.completedAt == null ? Colors.black : Colors.grey,
-                    decoration: task.completedAt == null
-                        ? TextDecoration.none
-                        : TextDecoration.lineThrough)),
+                        task.done ? Colors.grey : Colors.black,
+                    decoration: task.done
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none)),
           ),
         ),
       ]),
@@ -384,10 +384,10 @@ class _MainScreenState extends State<MainScreen> {
                 style: TextStyle(
                     fontSize: 15,
                     color:
-                        task.completedAt == null ? Colors.black : Colors.grey,
-                    decoration: task.completedAt == null
-                        ? TextDecoration.none
-                        : TextDecoration.lineThrough)),
+                        task.done ? Colors.grey : Colors.black,
+                    decoration: task.done
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none)),
           ),
         ),
       ]),
@@ -414,15 +414,15 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(
                   task.fromCalendar
                       ? Icons.calendar_today_rounded
-                      : (task.completedAt == null
-                          ? Icons.radio_button_unchecked
-                          : Icons.check_circle),
+                      : (task.done
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked),
                   color: Colors.grey[400]),
               onPressed: () {
                 if (task.fromCalendar) return;
                 setState(() {
                   var doneIndex =
-                      todayTasks.indexWhere((element) => element.done);
+                      todayTasks.indexWhere((element) => element.completedAt != null);
                   if (task.done) {
                     var firstCompletedIndex =
                         doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
@@ -474,6 +474,7 @@ class _MainScreenState extends State<MainScreen> {
             constraints: BoxConstraints(minWidth: 50),
             child: InkWell(
               onTap: () {
+                if (task.fromCalendar) return;
                 setState(() {
                   activeTask = task;
                 });
@@ -481,10 +482,10 @@ class _MainScreenState extends State<MainScreen> {
               child: Text(task.text,
                   style: TextStyle(
                       color:
-                          task.completedAt == null ? Colors.black : Colors.grey,
-                      decoration: task.completedAt == null
-                          ? TextDecoration.none
-                          : TextDecoration.lineThrough)),
+                          task.done ? Colors.grey : Colors.black,
+                      decoration: task.done
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none)),
             ),
           );
   }

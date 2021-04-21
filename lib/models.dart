@@ -71,7 +71,7 @@ class Task {
   DateTime? date;
 
   bool get done {
-    return completedAt != null;
+    return completedAt != null || (fromCalendar && DateTime.now().millisecondsSinceEpoch > date!.millisecondsSinceEpoch);
   }
 
   bool get fromCalendar {
