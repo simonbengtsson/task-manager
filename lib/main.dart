@@ -147,8 +147,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget buildTaskList(BuildContext context) {
     return DragTarget<Task>(onAcceptWithDetails: (details) {
       setState(() {
-        var index = todayTasks.indexOf(details.data);
-        todayTasks[index].date = null;
+        details.data.date = null;
       });
     }, builder: (context, candidateItems, rejectedItems) {
       return ListView(
@@ -186,9 +185,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget buildCalendarDay(Day day) {
     return DragTarget<Task>(onAcceptWithDetails: (details) {
       setState(() {
-        var index = todayTasks.indexOf(details.data);
-        todayTasks[index].date = day.date;
-        //details.data.date = day.date;
+        details.data.date = day.date;
       });
     }, builder: (context, candidateItems, rejectedItems) {
       return Container(
@@ -255,11 +252,6 @@ class _MainScreenState extends State<MainScreen> {
             ]),
             data: task,
             dragAnchorStrategy: pointerDragAnchorStrategy,
-            onDragCompleted: () {
-              setState(() {
-                task.date = null;
-              });
-            },
             child: Row(
               children: [
                 Padding(
@@ -270,7 +262,7 @@ class _MainScreenState extends State<MainScreen> {
                     color: Colors.grey[600],
                   ),
                 ),
-                Text(task.text),
+                Expanded(child: Text(task.text)),
               ],
             ),
           ),
