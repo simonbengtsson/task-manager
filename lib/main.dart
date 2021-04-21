@@ -184,28 +184,35 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('TextField in Dialog'),
+          title: Text('Add Calendar'),
           content: TextField(
+            autofocus: true,
             controller: _textFieldController,
-            decoration: InputDecoration(hintText: "Text Field in Dialog"),
+            decoration: InputDecoration(hintText: "Calendar URL"),
           ),
           actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.pop(context);
-              },
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: TextButton(
+                child: Text('CANCEL'),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
             ),
-            TextButton(
-              child: Text('Add'),
-              onPressed: () async {
-                Navigator.pop(context);
-                print(_textFieldController.text);
-                var calendars = await ValueStore().getCalendars();
-                calendars.add(_textFieldController.text);
-                await ValueStore().saveCalendars(calendars);
-                await loadCalendarEvents();
-              },
+            Padding(
+              padding: const EdgeInsets.only(left: 0, bottom: 8.0, top: 8, right: 8),
+              child: TextButton(
+                child: Text('ADD'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  print(_textFieldController.text);
+                  var calendars = await ValueStore().getCalendars();
+                  calendars.add(_textFieldController.text);
+                  await ValueStore().saveCalendars(calendars);
+                  await loadCalendarEvents();
+                },
+              ),
             ),
           ],
         );
