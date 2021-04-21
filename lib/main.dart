@@ -252,18 +252,21 @@ class _MainScreenState extends State<MainScreen> {
             ]),
             data: task,
             dragAnchorStrategy: pointerDragAnchorStrategy,
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 5.0),
-                  child: Icon(
-                    Icons.radio_button_unchecked,
-                    size: 14,
-                    color: Colors.grey[600],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: Icon(
+                      Icons.radio_button_unchecked,
+                      size: 14,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-                Expanded(child: Text(task.text)),
-              ],
+                  Expanded(child: Text(task.text)),
+                ],
+              ),
             ),
           ),
       ],
