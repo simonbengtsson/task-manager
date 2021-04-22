@@ -43,6 +43,9 @@ class _MainScreenState extends State<MainScreen> {
       });
     });
 
+    Timer.periodic(new Duration(minutes: 5), (timer) {
+      loadCalendarEvents();
+    });
     loadCalendarEvents();
 
     super.initState();
