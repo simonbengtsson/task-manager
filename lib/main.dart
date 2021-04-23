@@ -167,10 +167,7 @@ class _MainScreenState extends State<MainScreen> {
                   onPressed: () async {
                     Navigator.pop(context);
                     print(_textFieldController.text);
-                    var calendars = await ValueStore().getCalendars();
-                    calendars.add(_textFieldController.text);
-                    await ValueStore().saveCalendars(calendars);
-                    await model.loadCalendarEvents();
+                    model.addCalendar(Calendar(_textFieldController.text, "Unknown"));
                   },
                 ),
               ),

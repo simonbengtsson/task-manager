@@ -67,6 +67,7 @@ class AppModel extends ChangeNotifier {
   void addCalendar(Calendar item) {
     _calendar.add(item);
     notify();
+    loadCalendarEvents();
   }
 
   void notify() {
@@ -93,6 +94,7 @@ class AppModel extends ChangeNotifier {
 
   void persist() async {
     ValueStore().saveTasks(tasks);
+    ValueStore().saveCalendars(_calendar);
   }
 }
 
@@ -114,28 +116,29 @@ class Calendar {
 }
 
 class ValueStore {
-  Future saveCalendars(List<String> calendarUrls) async {
+  Future saveCalendars(List<Calendar> calendars) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String jsonString = jsonEncode(calendarUrls.toSet().toList());
-    await prefs.setString('calendars', jsonString);
+    var encoded = calendars.map((e) => e.toJson()).toList();
+    String jsonString = jsonEncode(encoded);
+    await prefs.setString('calendar_v2', jsonString);
   }
 
-  Future<List<String>> getCalendars() async {
+  Future<List<Calendar>> getCalendars() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String jsonString = prefs.getString('calendars') ?? '[]';
-    var saved = jsonDecode(jsonString) as List<String>;
-    return saved.toList();
+    String jsonString = prefs.getString('calendars_v2') ?? '[]';
+    var saved = jsonDecode(jsonString) as List<dynamic>;
+    return saved.map((dynamic e) => Calendar.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<Task>> loadCalendarEvents() async {
-    List<String> saved = await getCalendars();
+    List<Calendar> saved = await getCalendars();
 
     List<Task> allTasks = [];
-    for (var calendarUrl in saved) {
-      var res = await loadCalendarContent(calendarUrl);
-      final calendar = ICalendar.fromLines(res['fileLines'] as List<String>);
+    for (var calendar in saved) {
+      var res = await loadCalendarContent(calendar.url);
+      final iCalendar = ICalendar.fromLines(res['fileLines'] as List<String>);
       final events =
-        calendar.data!.where((element) => element['type'] == 'VEVENT' && Day(element['dtstart'] as DateTime).daySince1970 >= Day(DateTime.now()).daySince1970).toList();
+        iCalendar.data!.where((element) => element['type'] == 'VEVENT' && Day(element['dtstart'] as DateTime).daySince1970 >= Day(DateTime.now()).daySince1970).toList();
       print(events[0]);
       var tasks = events.map((e) => Task.fromIcs(e)).toList();
       allTasks.addAll(tasks);
