@@ -27,50 +27,15 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  List<Task> todayTasks = [];
   Task? activeTask;
 
   @override
   initState() {
-    ValueStore().loadTasks().then((tasks) {
-      setState(() {
-        todayTasks.addAll(tasks);
-      });
-    });
-
-    Timer.periodic(new Duration(minutes: 5), (timer) {
-      reload();
-    });
-    reload();
-
     super.initState();
-  }
-
-  reload() {
-    loadCalendarEvents();
-  }
-
-  loadCalendarEvents() async {
-    var tasks = await ValueStore().loadCalendarEvents();
-    tasks.forEach((element) {
-      print(element.text +
-          ' ' +
-          element.date!.toIso8601String() +
-          ' ' +
-          (element.calendarId ?? ''));
-    });
-    print("Fetched ${tasks.length}");
-    setState(() {
-      todayTasks.removeWhere((element) => element.fromCalendar);
-      todayTasks.addAll(tasks);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Find a better place for this?
-    ValueStore().saveTasks(todayTasks);
-
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,22 +58,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  loadDemoTasks() {
-    todayTasks.add(Task('Buy milk'));
-    todayTasks.add(Task('Run 5km'));
-    todayTasks.add(Task('Walk the dog'));
-
-    var food = Task('Food Conference');
-    food.date = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch - 48 * 3600 * 1000);
-    todayTasks.add(food);
-
-    var yoga = Task('Yoga');
-    yoga.date = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
-    todayTasks.add(yoga);
-  }
-
   Widget buildHeader(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(top: 30),
@@ -123,64 +72,64 @@ class _MainScreenState extends State<MainScreen> {
               ),
               Consumer<AppModel>(
                 builder: (context, model, child) {
-                  return  Text(
+                  return Text(
                       "${weekdays[model.today.weekday - 1]}, ${model.today.day} ${months[model.today.month - 1]}",
                       style: TextStyle(color: Colors.grey[600]));
                 },
               ),
             ]),
           ),
-          Tooltip(
-            message: 'Add Task',
-            child: IconButton(
-              icon: Icon(Icons.add),
-              onPressed: () {
-                this.setState(() {
-                  var task = Task.create();
-                  activeTask = task;
-                  todayTasks.insert(0, task);
-                });
-              },
+          Consumer<AppModel>(
+            builder: (context, model, child) => Tooltip(
+              message: 'Add Task',
+              child: IconButton(
+                icon: Icon(Icons.add),
+                onPressed: () {
+                  this.setState(() {
+                    var task = Task.create();
+                    activeTask = task;
+                    model.addTask(task, 0);
+                  });
+                },
+              ),
             ),
           ),
-          PopupMenuButton(
-            icon: Icon(Icons.more_horiz),
-            onSelected: (value) async {
-              if (value == "demo") {
-                setState(() {
-                  loadDemoTasks();
-                });
-              } else if (value == "removeAllTasks") {
-                setState(() {
-                  todayTasks.removeWhere((element) => !element.fromCalendar);
-                });
-              } else if (value == "addCalendar") {
-                presentAddCalendarDialog(context);
-              } else if (value == "removeAllCalendars") {
-                await ValueStore().saveCalendars([]);
-                loadCalendarEvents();
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              var demo = PopupMenuItem<String>(
-                value: "demo",
-                child: Text('Load Demo Tasks'),
-              );
-              var rmTasks = PopupMenuItem<String>(
-                value: "removeAllTasks",
-                child: Text('Remove all Tasks'),
-              );
-              var rmCalendars = PopupMenuItem<String>(
-                value: "removeAllCalendars",
-                child: Text('Remove all Calendars'),
-              );
-              var addCalendar = PopupMenuItem<String>(
-                value: "addCalendar",
-                child: Text('Add Calendar'),
-              );
-              return [addCalendar, demo, rmTasks, rmCalendars];
-            },
-          ),
+          Consumer<AppModel>(
+              builder: (context, model, child) => PopupMenuButton(
+                    icon: Icon(Icons.more_horiz),
+                    onSelected: (value) async {
+                      if (value == "demo") {
+                        setState(() {
+                          model.loadDemoTasks();
+                        });
+                      } else if (value == "removeAllTasks") {
+                        print("Not implemented yet");
+                      } else if (value == "addCalendar") {
+                        presentAddCalendarDialog(context);
+                      } else if (value == "removeAllCalendars") {
+                        print("Not implemented yet");
+                      }
+                    },
+                    itemBuilder: (BuildContext context) {
+                      var demo = PopupMenuItem<String>(
+                        value: "demo",
+                        child: Text('Load Demo Tasks'),
+                      );
+                      var rmTasks = PopupMenuItem<String>(
+                        value: "removeAllTasks",
+                        child: Text('Remove all Tasks'),
+                      );
+                      var rmCalendars = PopupMenuItem<String>(
+                        value: "removeAllCalendars",
+                        child: Text('Remove all Calendars'),
+                      );
+                      var addCalendar = PopupMenuItem<String>(
+                        value: "addCalendar",
+                        child: Text('Add Calendar'),
+                      );
+                      return [addCalendar, demo, rmTasks, rmCalendars];
+                    },
+                  )),
         ],
       ),
     );
@@ -188,8 +137,8 @@ class _MainScreenState extends State<MainScreen> {
 
   TextEditingController _textFieldController = TextEditingController();
 
-  presentAddCalendarDialog(BuildContext context) {
-    return showDialog(
+  Future<dynamic> presentAddCalendarDialog(BuildContext context) {
+    return showDialog<dynamic>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -209,19 +158,21 @@ class _MainScreenState extends State<MainScreen> {
                 },
               ),
             ),
-            Padding(
-              padding:
-                  const EdgeInsets.only(left: 0, bottom: 8.0, top: 8, right: 8),
-              child: TextButton(
-                child: Text('ADD'),
-                onPressed: () async {
-                  Navigator.pop(context);
-                  print(_textFieldController.text);
-                  var calendars = await ValueStore().getCalendars();
-                  calendars.add(_textFieldController.text);
-                  await ValueStore().saveCalendars(calendars);
-                  await loadCalendarEvents();
-                },
+            Consumer<AppModel>(
+              builder: (context, AppModel model, child) => Padding(
+                padding:
+                    const EdgeInsets.only(left: 0, bottom: 8.0, top: 8, right: 8),
+                child: TextButton(
+                  child: Text('ADD'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    print(_textFieldController.text);
+                    var calendars = await ValueStore().getCalendars();
+                    calendars.add(_textFieldController.text);
+                    await ValueStore().saveCalendars(calendars);
+                    await model.loadCalendarEvents();
+                  },
+                ),
               ),
             ),
           ],
@@ -236,48 +187,48 @@ class _MainScreenState extends State<MainScreen> {
         details.data.date = null;
       });
     }, builder: (context, candidateItems, rejectedItems) {
-      return ListView(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        /*onReorder: (int oldIndex, int newIndex) {
-          setState(() {
-            if (oldIndex < newIndex) {
-              newIndex -= 1;
-            }
-            var item = todayTasks.removeAt(oldIndex);
-            todayTasks.insert(newIndex, item);
-          });
-        },*/
-        children: [
-          for (var entry in todayTasks
-              .where((element) {
-                var date = element.date;
-                if (date == null) return true;
-                return Day(date).daySince1970 <=
-                    Day(DateTime.now()).daySince1970;
-              })
-              .toList()
-              .asMap()
-              .entries)
-            buildTaskRow(context, entry.key, entry.value)
-        ],
+      return Consumer<AppModel>(
+        builder: (ctx, model, child) => ListView(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          /*onReorder: (int oldIndex, int newIndex) {
+            setState(() {
+              if (oldIndex < newIndex) {
+                newIndex -= 1;
+              }
+              var item = todayTasks.removeAt(oldIndex);
+              todayTasks.insert(newIndex, item);
+            });
+          },*/
+          children: [
+            for (var entry in model.tasks
+                .where((element) {
+                  var date = element.date;
+                  if (date == null) return true;
+                  return Day(date).daySince1970 <=
+                      Day(DateTime.now()).daySince1970;
+                })
+                .toList()
+                .asMap()
+                .entries)
+              buildTaskRow(context, entry.key, entry.value)
+          ],
+        ),
       );
     });
   }
 
   Widget buildCalendar(BuildContext context) {
-    return Consumer<AppModel>(
-      builder: (context, model, child) {
-        return Container(
-          height: 240,
-          child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [for (var day in calendarDays(model.today)) buildCalendarDay(day)]),
-        );
-      }
-    );
+    return Consumer<AppModel>(builder: (context, model, child) {
+      return Container(
+        height: 240,
+        child: ListView(scrollDirection: Axis.horizontal, children: [
+          for (var day in calendarDays(model.today)) buildCalendarDay(day)
+        ]),
+      );
+    });
   }
 
-  List<Day> calendarDays(today) {
+  List<Day> calendarDays(DateTime today) {
     return List<Day>.generate(14, (int i) {
       var timestamp = today.millisecondsSinceEpoch + (i + 1) * 24 * 3600 * 1000;
       var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
@@ -292,35 +243,37 @@ class _MainScreenState extends State<MainScreen> {
         details.data.date = day.date;
       });
     }, builder: (context, candidateItems, rejectedItems) {
-      return Container(
-        width: 200,
-        decoration: BoxDecoration(
-          color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
-          border: Border.all(color: Colors.grey[100]!),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  "${weekdays[day.date.weekday - 1]} ${day.date.day}",
-                  style: TextStyle(
-                      fontWeight: FontWeight.w500, color: Colors.grey[500]),
+      return Consumer<AppModel>(
+        builder: (ctx, model, child) => Container(
+          width: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey[[6, 7].contains(day.date.weekday) ? 300 : 200],
+            border: Border.all(color: Colors.grey[100]!),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    "${weekdays[day.date.weekday - 1]} ${day.date.day}",
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500, color: Colors.grey[500]),
+                  ),
                 ),
-              ),
-              buildCalendarDayTaskList(day),
-            ],
+                buildCalendarDayTaskList(day, model.tasks),
+              ],
+            ),
           ),
         ),
       );
     });
   }
 
-  Widget buildCalendarDayTaskList(Day day) {
-    var dayTasks = todayTasks.where((element) {
+  Widget buildCalendarDayTaskList(Day day, List<Task> tasks) {
+    var dayTasks = tasks.where((element) {
       var date = element.date;
       if (date == null) return false;
       return Day(date).daySince1970 == day.daySince1970;
@@ -424,56 +377,56 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget buildTaskInsideRow(Task task, int index) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        border: Border.all(color: Colors.grey[100]!),
+    return Consumer<AppModel>(
+      builder: (ctx, model, child) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          border: Border.all(color: Colors.grey[100]!),
+        ),
+        key: Key(index.toString()),
+        height: 50,
+        child: Row(children: [
+          Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: IconButton(
+                hoverColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                icon: Icon(
+                    task.fromCalendar
+                        ? Icons.calendar_today_rounded
+                        : (task.done
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked),
+                    color: Colors.grey[400]),
+                onPressed: () {
+                  if (task.fromCalendar) return;
+                  setState(() {
+                    var tasks = model.tasks;
+                    var doneIndex = tasks
+                        .indexWhere((element) => element.completedAt != null);
+                    if (task.done) {
+                      var firstCompletedIndex =
+                          doneIndex < 0 ? tasks.length - 1 : doneIndex;
+                      task.completedAt = null;
+                      model.moveTask(task, firstCompletedIndex);
+                    } else {
+                      var firstCompletedIndex =
+                          doneIndex < 0 ? tasks.length - 1 : doneIndex - 1;
+                      task.completedAt = DateTime.now();
+                      model.moveTask(task, firstCompletedIndex);
+                    }
+                  });
+                },
+              )),
+          buildTaskRowText(task, model),
+        ]),
       ),
-      key: Key(index.toString()),
-      height: 50,
-      child: Row(children: [
-        Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: IconButton(
-              hoverColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              icon: Icon(
-                  task.fromCalendar
-                      ? Icons.calendar_today_rounded
-                      : (task.done
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked),
-                  color: Colors.grey[400]),
-              onPressed: () {
-                if (task.fromCalendar) return;
-                setState(() {
-                  var doneIndex = todayTasks
-                      .indexWhere((element) => element.completedAt != null);
-                  if (task.done) {
-                    var firstCompletedIndex =
-                        doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
-                    task.completedAt = null;
-                    var index = todayTasks.indexOf(task);
-                    var item = todayTasks.removeAt(index);
-                    todayTasks.insert(firstCompletedIndex, item);
-                  } else {
-                    var firstCompletedIndex =
-                        doneIndex < 0 ? todayTasks.length - 1 : doneIndex - 1;
-                    task.completedAt = DateTime.now();
-                    todayTasks.remove(task);
-                    todayTasks.insert(firstCompletedIndex, task);
-                  }
-                });
-              },
-            )),
-        buildTaskRowText(task),
-      ]),
     );
   }
 
-  Widget buildTaskRowText(Task task) {
+  Widget buildTaskRowText(Task task, AppModel model) {
     return task == activeTask
         ? Expanded(
             child: Padding(
@@ -485,7 +438,7 @@ class _MainScreenState extends State<MainScreen> {
                   setState(() {
                     activeTask = null;
                     if (task.text.isEmpty) {
-                      todayTasks.remove(task);
+                      model.removeTask(task);
                     }
                   });
                 },

@@ -12,7 +12,7 @@ class AppModel extends ChangeNotifier {
 
   AppModel() {
     Timer.periodic(Duration(minutes: 5), (timer) {
-      // Refresh calendars
+      loadCalendarEvents();
     });
     Timer.periodic(Duration(minutes: 1), (timer) {
       if (Day(this.today).daySince1970 != Day(DateTime.now()).daySince1970) {
@@ -20,6 +20,19 @@ class AppModel extends ChangeNotifier {
         notifyListeners();
       }
     });
+
+    ValueStore().loadTasks().then((tasks) {
+      _tasks.addAll(tasks);
+      notifyListeners();
+    });
+  }
+
+  Future loadCalendarEvents() async {
+    var newTasks = await ValueStore().loadCalendarEvents();
+    print("Fetched events: ${newTasks.length}");
+    _tasks.removeWhere((element) => element.fromCalendar);
+    _tasks.addAll(newTasks);
+    notifyListeners();
   }
 
   final List<Task> _tasks = [];
@@ -31,8 +44,23 @@ class AppModel extends ChangeNotifier {
   DateTime get today => _today;
   DateTime _today = DateTime.now();
 
-  void addTask(Task item) {
-    _tasks.add(item);
+  void moveTask(Task task, int index) {
+    _tasks.remove(task);
+    _tasks.insert(index, task);
+    notify();
+  }
+
+  void removeTask(Task task) {
+    _tasks.remove(task);
+    notify();
+  }
+
+  void addTask(Task item, int? index) {
+    if (index != null) {
+      _tasks.insert(index, item);
+    } else {
+      _tasks.add(item);
+    }
     notify();
   }
 
@@ -46,8 +74,25 @@ class AppModel extends ChangeNotifier {
     persist();
   }
 
+  void loadDemoTasks() {
+    _tasks.add(Task('Buy milk'));
+    _tasks.add(Task('Run 5km'));
+    _tasks.add(Task('Walk the dog'));
+
+    var food = Task('Food Conference');
+    food.date = DateTime.fromMillisecondsSinceEpoch(
+        DateTime.now().millisecondsSinceEpoch - 48 * 3600 * 1000);
+    _tasks.add(food);
+
+    var yoga = Task('Yoga');
+    yoga.date = DateTime.fromMillisecondsSinceEpoch(
+        DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
+    _tasks.add(yoga);
+    notify();
+  }
+
   void persist() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    ValueStore().saveTasks(tasks);
   }
 }
 
@@ -64,12 +109,12 @@ class Calendar {
   }
 
   Map<String, dynamic> toJson() {
-    return {'url': url, 'name': name};
+    return <String, dynamic>{'url': url, 'name': name};
   }
 }
 
 class ValueStore {
-  saveCalendars(List<String> calendarUrls) async {
+  Future saveCalendars(List<String> calendarUrls) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String jsonString = jsonEncode(calendarUrls.toSet().toList());
     await prefs.setString('calendars', jsonString);
@@ -78,8 +123,8 @@ class ValueStore {
   Future<List<String>> getCalendars() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String jsonString = prefs.getString('calendars') ?? '[]';
-    List<dynamic> saved = jsonDecode(jsonString);
-    return saved.map((e) => e as String).toList();
+    var saved = jsonDecode(jsonString) as List<String>;
+    return saved.toList();
   }
 
   Future<List<Task>> loadCalendarEvents() async {
@@ -88,7 +133,7 @@ class ValueStore {
     List<Task> allTasks = [];
     for (var calendarUrl in saved) {
       var res = await loadCalendarContent(calendarUrl);
-      final calendar = ICalendar.fromLines(res['fileLines']);
+      final calendar = ICalendar.fromLines(res['fileLines'] as List<String>);
       final events =
         calendar.data!.where((element) => element['type'] == 'VEVENT' && Day(element['dtstart'] as DateTime).daySince1970 >= Day(DateTime.now()).daySince1970).toList();
       print(events[0]);
@@ -98,24 +143,24 @@ class ValueStore {
     return allTasks;
   }
 
-  loadCalendarContent(calendarUrl) async {
+  Future<Map<String, dynamic>> loadCalendarContent(String calendarUrl) async {
     var res = await http.get(Uri.parse(calendarUrl));
     var lines = res.body.split('\r\n');
     var nameProperty = 'X-WR-CALNAME:';
     var nameLine = lines.firstWhere((line) => line.startsWith(nameProperty), orElse: () => 'Unknown');
     var name = nameLine.replaceAll(nameProperty, '').trim();
-    return {'fileLines': lines, 'name': name};
+    return <String, dynamic>{'fileLines': lines, 'name': name};
   }
 
   Future<List<Task>> loadTasks() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String jsonString = prefs.getString('tasks') ?? '[]';
-    List<dynamic> saved = jsonDecode(jsonString);
-    var tasks = saved.map((e) => Task.fromJson(e)).toList();
+    var saved = jsonDecode(jsonString) as List<dynamic>;
+    var tasks = saved.map((dynamic e) => Task.fromJson(e as Map<String, dynamic>)).toList();
     return tasks;
   }
 
-  saveTasks(List<Task> tasks) async {
+  Future saveTasks(List<Task> tasks) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var data = tasks.map((e) => e.toJson()).toList();
     String jsonString = jsonEncode(data);
