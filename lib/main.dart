@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
@@ -29,14 +31,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   initState() {
-    var now = DateTime.now();
-    days = List<Day>.generate(14, (int i) {
-      var timestamp = now.millisecondsSinceEpoch + (i + 1) * 24 * 3600 * 1000;
-      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      var day = Day(date);
-      return day;
-    });
-
     ValueStore().loadTasks().then((tasks) {
       setState(() {
         todayTasks.addAll(tasks);
@@ -143,15 +137,18 @@ class _MainScreenState extends State<MainScreen> {
                   style: TextStyle(color: Colors.grey[600]))
             ]),
           ),
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () {
-              this.setState(() {
-                var task = Task.create();
-                activeTask = task;
-                todayTasks.insert(0, task);
-              });
-            },
+          Tooltip(
+            message: 'Add Task',
+            child: IconButton(
+              icon: Icon(Icons.add),
+              onPressed: () {
+                this.setState(() {
+                  var task = Task.create();
+                  activeTask = task;
+                  todayTasks.insert(0, task);
+                });
+              },
+            ),
           ),
           PopupMenuButton(
             icon: Icon(Icons.more_horiz),
@@ -220,7 +217,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 0, bottom: 8.0, top: 8, right: 8),
+              padding:
+                  const EdgeInsets.only(left: 0, bottom: 8.0, top: 8, right: 8),
               child: TextButton(
                 child: Text('ADD'),
                 onPressed: () async {
@@ -350,8 +348,7 @@ class _MainScreenState extends State<MainScreen> {
             child: Text(task.text,
                 style: TextStyle(
                     fontSize: 15,
-                    color:
-                        task.done ? Colors.grey : Colors.black,
+                    color: task.done ? Colors.grey : Colors.black,
                     decoration: task.done
                         ? TextDecoration.lineThrough
                         : TextDecoration.none)),
@@ -409,8 +406,7 @@ class _MainScreenState extends State<MainScreen> {
             child: Text(task.text,
                 style: TextStyle(
                     fontSize: 15,
-                    color:
-                        task.done ? Colors.grey : Colors.black,
+                    color: task.done ? Colors.grey : Colors.black,
                     decoration: task.done
                         ? TextDecoration.lineThrough
                         : TextDecoration.none)),
@@ -447,8 +443,8 @@ class _MainScreenState extends State<MainScreen> {
               onPressed: () {
                 if (task.fromCalendar) return;
                 setState(() {
-                  var doneIndex =
-                      todayTasks.indexWhere((element) => element.completedAt != null);
+                  var doneIndex = todayTasks
+                      .indexWhere((element) => element.completedAt != null);
                   if (task.done) {
                     var firstCompletedIndex =
                         doneIndex < 0 ? todayTasks.length - 1 : doneIndex;
@@ -507,8 +503,7 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: Text(task.text,
                   style: TextStyle(
-                      color:
-                          task.done ? Colors.grey : Colors.black,
+                      color: task.done ? Colors.grey : Colors.black,
                       decoration: task.done
                           ? TextDecoration.lineThrough
                           : TextDecoration.none)),
