@@ -16,6 +16,7 @@ dependencies:
   shared_preferences: ^2.0.5
   icalendar_parser:
     git: https://github.com/simonbengtsson/icalendar_parser.git
+  provider: ^5.0.0
 
 dev_dependencies:
   flutter_test:
