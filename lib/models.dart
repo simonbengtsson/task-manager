@@ -1,9 +1,72 @@
+import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:icalendar_parser/icalendar_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class AppModel extends ChangeNotifier {
+
+  AppModel() {
+    Timer.periodic(Duration(minutes: 5), (timer) {
+      // Refresh calendars
+    });
+    Timer.periodic(Duration(minutes: 1), (timer) {
+      if (Day(this.today).daySince1970 != Day(DateTime.now()).daySince1970) {
+        _today = DateTime.now();
+        notifyListeners();
+      }
+    });
+  }
+
+  final List<Task> _tasks = [];
+  UnmodifiableListView<Task> get tasks => UnmodifiableListView(_tasks);
+
+  final List<Calendar> _calendar = [];
+  UnmodifiableListView<Calendar> get calendar => UnmodifiableListView(_calendar);
+
+  DateTime get today => _today;
+  DateTime _today = DateTime.now();
+
+  void addTask(Task item) {
+    _tasks.add(item);
+    notify();
+  }
+
+  void addCalendar(Calendar item) {
+    _calendar.add(item);
+    notify();
+  }
+
+  void notify() {
+    notifyListeners();
+    persist();
+  }
+
+  void persist() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+  }
+}
+
+class Calendar {
+  String url;
+  String name;
+
+  Calendar(this.url, this.name);
+
+  factory Calendar.fromJson(Map<String, dynamic> json) {
+    var url = json["url"] as String;
+    var name = json["name"] as String;
+    return Calendar(url, name);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'url': url, 'name': name};
+  }
+}
 
 class ValueStore {
   saveCalendars(List<String> calendarUrls) async {
@@ -24,10 +87,8 @@ class ValueStore {
 
     List<Task> allTasks = [];
     for (var calendarUrl in saved) {
-      var res = await http.get(Uri.parse(calendarUrl));
-      var lines = res.body.split('\r\n');
-      print("Lines: ${lines.length}");
-      final calendar = ICalendar.fromLines(lines);
+      var res = await loadCalendarContent(calendarUrl);
+      final calendar = ICalendar.fromLines(res['fileLines']);
       final events =
         calendar.data!.where((element) => element['type'] == 'VEVENT' && Day(element['dtstart'] as DateTime).daySince1970 >= Day(DateTime.now()).daySince1970).toList();
       print(events[0]);
@@ -35,6 +96,15 @@ class ValueStore {
       allTasks.addAll(tasks);
     }
     return allTasks;
+  }
+
+  loadCalendarContent(calendarUrl) async {
+    var res = await http.get(Uri.parse(calendarUrl));
+    var lines = res.body.split('\r\n');
+    var nameProperty = 'X-WR-CALNAME:';
+    var nameLine = lines.firstWhere((line) => line.startsWith(nameProperty), orElse: () => 'Unknown');
+    var name = nameLine.replaceAll(nameProperty, '').trim();
+    return {'fileLines': lines, 'name': name};
   }
 
   Future<List<Task>> loadTasks() async {

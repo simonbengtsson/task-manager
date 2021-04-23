@@ -1,11 +1,13 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'models.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(ChangeNotifierProvider(create: (ctx) => AppModel(), child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -26,7 +28,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   List<Task> todayTasks = [];
-  List<Day> days = [];
   Task? activeTask;
 
   @override
@@ -46,18 +47,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   reload() {
-    var now = DateTime.now();
-    var dayList = List<Day>.generate(14, (int i) {
-      var timestamp = now.millisecondsSinceEpoch + (i + 1) * 24 * 3600 * 1000;
-      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      var day = Day(date);
-      return day;
-    });
-
-    setState(() {
-      days = dayList;
-    });
-
     loadCalendarEvents();
   }
 
@@ -132,9 +121,13 @@ class _MainScreenState extends State<MainScreen> {
                 'Today',
                 style: TextStyle(fontSize: 28),
               ),
-              Text(
-                  "${weekdays[DateTime.now().weekday - 1]}, ${DateTime.now().day} ${months[DateTime.now().month - 1]}",
-                  style: TextStyle(color: Colors.grey[600]))
+              Consumer<AppModel>(
+                builder: (context, model, child) {
+                  return  Text(
+                      "${weekdays[model.today.weekday - 1]}, ${model.today.day} ${months[model.today.month - 1]}",
+                      style: TextStyle(color: Colors.grey[600]));
+                },
+              ),
             ]),
           ),
           Tooltip(
@@ -272,12 +265,25 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget buildCalendar(BuildContext context) {
-    return Container(
-      height: 240,
-      child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: [for (var day in days) buildCalendarDay(day)]),
+    return Consumer<AppModel>(
+      builder: (context, model, child) {
+        return Container(
+          height: 240,
+          child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [for (var day in calendarDays(model.today)) buildCalendarDay(day)]),
+        );
+      }
     );
+  }
+
+  List<Day> calendarDays(today) {
+    return List<Day>.generate(14, (int i) {
+      var timestamp = today.millisecondsSinceEpoch + (i + 1) * 24 * 3600 * 1000;
+      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      var day = Day(date);
+      return day;
+    });
   }
 
   Widget buildCalendarDay(Day day) {
