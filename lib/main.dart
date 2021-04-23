@@ -44,11 +44,27 @@ class _MainScreenState extends State<MainScreen> {
     });
 
     Timer.periodic(new Duration(minutes: 5), (timer) {
-      loadCalendarEvents();
+      reload();
     });
-    loadCalendarEvents();
+    reload();
 
     super.initState();
+  }
+
+  reload() {
+    var now = DateTime.now();
+    var dayList = List<Day>.generate(14, (int i) {
+      var timestamp = now.millisecondsSinceEpoch + (i + 1) * 24 * 3600 * 1000;
+      var date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      var day = Day(date);
+      return day;
+    });
+
+    setState(() {
+      days = dayList;
+    });
+
+    loadCalendarEvents();
   }
 
   loadCalendarEvents() async {
