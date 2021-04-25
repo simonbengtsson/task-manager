@@ -8,9 +8,38 @@ import 'package:icalendar_parser/icalendar_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Api {
+  Future<ICalendar> fetchCalendar(String calendarUrl) async {
+    var url = Uri.parse(calendarUrl);
+    var res = await http.get(url);
+
+    return ICalendar.fromString(res.body);
+  }
+
   Future<List<Task>> fetchCalendarEvents() async {
     List<Calendar> saved = await ValueStore().getCalendars();
 
+    List<Task> allTasks = [];
+    for (var calendar in saved) {
+      final iCalendar = await fetchCalendar(calendar.url);
+      var tasks = parseCalendarTasks(iCalendar);
+      allTasks.addAll(tasks);
+    }
+    return allTasks;
+  }
+
+  List<Task> parseCalendarTasks(ICalendar calendar) {
+    final events = calendar.data!.where((element) {
+      if (element['type'] != 'VEVENT') return false;
+      var date = element['dtstart'] as DateTime;
+      return Day.fromDate(date) >= Day.today().modified(-10);
+    }).toList();
+    return events.map((e) => Task.fromIcs(e)).toList();
+  }
+}
+
+class AppModel extends ChangeNotifier {
+  AppModel() {
+    ICalendar.registerField(field: "X-WR-CALNAME");
     ICalendar.unregisterField("DTSTART");
     ICalendar.registerField(
         field: "DTSTART",
@@ -21,35 +50,6 @@ class Api {
           return lastEvent;
         });
 
-    List<Task> allTasks = [];
-    for (var calendar in saved) {
-      var res = await _loadCalendarContent(calendar.url);
-      final iCalendar = ICalendar.fromLines(res['fileLines'] as List<String>);
-      final events = iCalendar.data!.where((element) {
-        if (element['type'] != 'VEVENT') return false;
-        var date = element['dtstart'] as DateTime;
-        return Day.fromDate(date) >= Day.today().modified(-10);
-      }).toList();
-      var tasks = events.map((e) => Task.fromIcs(e)).toList();
-      allTasks.addAll(tasks);
-    }
-    return allTasks;
-  }
-
-  Future<Map<String, dynamic>> _loadCalendarContent(String calendarUrl) async {
-    var url = Uri.parse(calendarUrl);
-    var res = await http.get(url);
-    var lines = res.body.split('\r\n');
-    var nameProperty = 'X-WR-CALNAME:';
-    var nameLine = lines.firstWhere((line) => line.startsWith(nameProperty),
-        orElse: () => 'Unknown');
-    var name = nameLine.replaceAll(nameProperty, '').trim();
-    return <String, dynamic>{'fileLines': lines, 'name': name};
-  }
-}
-
-class AppModel extends ChangeNotifier {
-  AppModel() {
     Timer.periodic(Duration(minutes: 5), (timer) {
       updateCalendarEvents();
     });

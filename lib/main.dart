@@ -165,9 +165,15 @@ class _MainScreenState extends State<MainScreen> {
                   child: Text('ADD'),
                   onPressed: () async {
                     Navigator.pop(context);
-                    print(_textFieldController.text);
-                    model.addCalendar(
-                        Calendar(_textFieldController.text, "Unknown"));
+                    var url = _textFieldController.text;
+                    print(url);
+                    try {
+                      var calendar = await Api().fetchCalendar(url);
+                      var name = calendar.headData!['x-wr-calname'] as String?;
+                      model.addCalendar(Calendar(url, name ?? "Unknown"));
+                    } catch(ex) {
+                      print("Could not add calendar ${ex}");
+                    }
                   },
                 ),
               ),
@@ -246,6 +252,18 @@ class _MainScreenState extends State<MainScreen> {
   Widget buildCalendarDayTaskList(Day day, List<Task> tasks) {
     var dayTasks = tasks.where((element) {
       return element.day == day;
+    }).toList();
+    dayTasks.sort((one, two) {
+      if (one.calendarAllDay) return -1;
+      if (two.calendarAllDay) return 1;
+
+      if (one.fromCalendar && !two.fromCalendar) return -1;
+      if (!one.fromCalendar && two.fromCalendar) return 1;
+      if (one.fromCalendar && two.fromCalendar) {
+        return one.calendarDate!.compareTo(two.calendarDate!);
+      }
+
+      return 0;
     });
     return Column(
       children: [
