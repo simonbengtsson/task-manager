@@ -1,48 +1,96 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:icalendar_parser/icalendar_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AppModel extends ChangeNotifier {
+class Api {
+  Future<List<Task>> fetchCalendarEvents() async {
+    List<Calendar> saved = await ValueStore().getCalendars();
 
+    ICalendar.unregisterField("DTSTART");
+    ICalendar.registerField(
+        field: "DTSTART",
+        function: (String value, Map<String, String> params, List events,
+            Map<String, dynamic> lastEvent) {
+          lastEvent['dtstart'] = DateTime.parse(value).toLocal();
+          lastEvent['dtstart_allday'] = params['VALUE'] == 'DATE';
+          return lastEvent;
+        });
+
+    List<Task> allTasks = [];
+    for (var calendar in saved) {
+      var res = await _loadCalendarContent(calendar.url);
+      final iCalendar = ICalendar.fromLines(res['fileLines'] as List<String>);
+      final events = iCalendar.data!.where((element) {
+        if (element['type'] != 'VEVENT') return false;
+        var date = element['dtstart'] as DateTime;
+        return Day.fromDate(date) >= Day.today().modified(-10);
+      }).toList();
+      var tasks = events.map((e) => Task.fromIcs(e)).toList();
+      allTasks.addAll(tasks);
+    }
+    return allTasks;
+  }
+
+  Future<Map<String, dynamic>> _loadCalendarContent(String calendarUrl) async {
+    var url = Uri.parse(calendarUrl);
+    var res = await http.get(url);
+    var lines = res.body.split('\r\n');
+    var nameProperty = 'X-WR-CALNAME:';
+    var nameLine = lines.firstWhere((line) => line.startsWith(nameProperty),
+        orElse: () => 'Unknown');
+    var name = nameLine.replaceAll(nameProperty, '').trim();
+    return <String, dynamic>{'fileLines': lines, 'name': name};
+  }
+}
+
+class AppModel extends ChangeNotifier {
   AppModel() {
     Timer.periodic(Duration(minutes: 5), (timer) {
-      loadCalendarEvents();
+      updateCalendarEvents();
     });
     Timer.periodic(Duration(minutes: 1), (timer) {
-      if (Day(this.today).daySince1970 != Day(DateTime.now()).daySince1970) {
-        _today = DateTime.now();
+      if (this.today != Day.today()) {
+        _today = Day.today();
         notifyListeners();
       }
     });
-
-    ValueStore().loadTasks().then((tasks) {
-      _tasks.addAll(tasks);
-      notifyListeners();
-    });
+    loadInitial();
   }
 
-  Future loadCalendarEvents() async {
-    var newTasks = await ValueStore().loadCalendarEvents();
-    print("Fetched events: ${newTasks.length}");
-    _tasks.removeWhere((element) => element.fromCalendar);
-    _tasks.addAll(newTasks);
+  Future loadInitial() async {
+    var tasks = await ValueStore().getTasks();
+    var calendars = await ValueStore().getCalendars();
+    print("Tasks: ${tasks.length} Calendars: ${calendars.length}");
+    _tasks.addAll(tasks);
+    _calendars.addAll(calendars);
     notifyListeners();
   }
 
   final List<Task> _tasks = [];
+
   UnmodifiableListView<Task> get tasks => UnmodifiableListView(_tasks);
 
-  final List<Calendar> _calendar = [];
-  UnmodifiableListView<Calendar> get calendar => UnmodifiableListView(_calendar);
+  List<Calendar> _calendars = [];
 
-  DateTime get today => _today;
-  DateTime _today = DateTime.now();
+  UnmodifiableListView<Calendar> get calendars =>
+      UnmodifiableListView(_calendars);
+
+  Day get today => _today;
+  Day _today = Day.today();
+
+  Future updateCalendarEvents() async {
+    var newTasks = await Api().fetchCalendarEvents();
+    print("Fetched events: ${newTasks.length}");
+    _tasks.removeWhere((element) => element.fromCalendar);
+    _tasks.addAll(newTasks);
+    print("Updated ${newTasks.length}");
+    notify();
+  }
 
   void moveTask(Task task, int index) {
     _tasks.remove(task);
@@ -50,9 +98,40 @@ class AppModel extends ChangeNotifier {
     notify();
   }
 
+  void toggleTaskCompletion(Task task) {
+    if (task.completedAt == null) {
+      task.completedAt = DateTime.now();
+    } else {
+      task.completedAt = null;
+    }
+    notify();
+  }
+
+  void changeTaskDate(Task task, Day newDay) {
+    task.todoDay = newDay;
+    notify();
+  }
+
   void removeTask(Task task) {
     _tasks.remove(task);
     notify();
+  }
+
+  void removeAllTask() {
+    _tasks.clear();
+    notify();
+  }
+
+  void removeAllCalendars() {
+    _calendars.clear();
+    notify();
+  }
+
+  void removeCalendar(Calendar calendar) {
+    _calendars.remove(calendar);
+    persist().then((res) {
+      updateCalendarEvents();
+    });
   }
 
   void addTask(Task item, int? index) {
@@ -65,36 +144,36 @@ class AppModel extends ChangeNotifier {
   }
 
   void addCalendar(Calendar item) {
-    _calendar.add(item);
-    notify();
-    loadCalendarEvents();
+    _calendars.add(item);
+    persist().then((res) {
+      updateCalendarEvents();
+    });
   }
 
-  void notify() {
+  Future notify() async {
     notifyListeners();
-    persist();
+    await persist();
   }
 
   void loadDemoTasks() {
-    _tasks.add(Task('Buy milk'));
-    _tasks.add(Task('Run 5km'));
-    _tasks.add(Task('Walk the dog'));
+    _tasks.add(Task('Buy milk', Day.today()));
+    _tasks.add(Task('Run 5km', Day.today()));
+    _tasks.add(Task('Walk the dog', Day.today()));
 
-    var food = Task('Food Conference');
-    food.date = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch - 48 * 3600 * 1000);
+    var food = Task('Food Conference', Day.today());
+    food.todoDay = Day.today().modified(-2);
     _tasks.add(food);
 
-    var yoga = Task('Yoga');
-    yoga.date = DateTime.fromMillisecondsSinceEpoch(
-        DateTime.now().millisecondsSinceEpoch + 24 * 3600 * 1000);
+    var yoga = Task('Yoga', Day.today());
+    yoga.todoDay = Day.today().modified(1);
     _tasks.add(yoga);
     notify();
   }
 
-  void persist() async {
-    ValueStore().saveTasks(tasks);
-    ValueStore().saveCalendars(_calendar);
+  Future<void> persist() async {
+    print("Persist: c ${calendars.length} t ${tasks.length}");
+    await ValueStore().saveTasks(tasks);
+    await ValueStore().saveCalendars(_calendars);
   }
 }
 
@@ -120,46 +199,41 @@ class ValueStore {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var encoded = calendars.map((e) => e.toJson()).toList();
     String jsonString = jsonEncode(encoded);
-    await prefs.setString('calendar_v2', jsonString);
+    await prefs.setString('calendars_v2', jsonString);
   }
 
   Future<List<Calendar>> getCalendars() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String jsonString = prefs.getString('calendars_v2') ?? '[]';
     var saved = jsonDecode(jsonString) as List<dynamic>;
-    return saved.map((dynamic e) => Calendar.fromJson(e as Map<String, dynamic>)).toList();
+    return saved
+        .map((dynamic e) {
+          try {
+            return Calendar.fromJson(e as Map<String, dynamic>);
+          } catch (ex) {
+            print("Could not parse saved calendar: ${ex}");
+            return null;
+          }
+        })
+        .whereType<Calendar>()
+        .toList();
   }
 
-  Future<List<Task>> loadCalendarEvents() async {
-    List<Calendar> saved = await getCalendars();
-
-    List<Task> allTasks = [];
-    for (var calendar in saved) {
-      var res = await loadCalendarContent(calendar.url);
-      final iCalendar = ICalendar.fromLines(res['fileLines'] as List<String>);
-      final events =
-        iCalendar.data!.where((element) => element['type'] == 'VEVENT' && Day(element['dtstart'] as DateTime).daySince1970 >= Day(DateTime.now()).daySince1970).toList();
-      print(events[0]);
-      var tasks = events.map((e) => Task.fromIcs(e)).toList();
-      allTasks.addAll(tasks);
-    }
-    return allTasks;
-  }
-
-  Future<Map<String, dynamic>> loadCalendarContent(String calendarUrl) async {
-    var res = await http.get(Uri.parse(calendarUrl));
-    var lines = res.body.split('\r\n');
-    var nameProperty = 'X-WR-CALNAME:';
-    var nameLine = lines.firstWhere((line) => line.startsWith(nameProperty), orElse: () => 'Unknown');
-    var name = nameLine.replaceAll(nameProperty, '').trim();
-    return <String, dynamic>{'fileLines': lines, 'name': name};
-  }
-
-  Future<List<Task>> loadTasks() async {
+  Future<List<Task>> getTasks() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String jsonString = prefs.getString('tasks') ?? '[]';
     var saved = jsonDecode(jsonString) as List<dynamic>;
-    var tasks = saved.map((dynamic e) => Task.fromJson(e as Map<String, dynamic>)).toList();
+    var tasks = saved
+        .map((dynamic e) {
+          try {
+            return Task.fromJson(e as Map<String, dynamic>);
+          } catch (ex) {
+            print("Could not load task: ${ex}");
+            return null;
+          }
+        })
+        .whereType<Task>()
+        .toList();
     return tasks;
   }
 
@@ -171,43 +245,49 @@ class ValueStore {
   }
 }
 
-Random random = Random();
-
-String generateId() {
-  const chars =
-      'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
-  int length = 10;
-  var item = Iterable.generate(
-      length, (_) => chars.codeUnitAt(random.nextInt(chars.length)));
-  return String.fromCharCodes(item);
-}
-
 class Task {
   String text;
+  Day? todoDay;
+
   String? calendarId;
+  DateTime? calendarDate;
+  bool calendarAllDay = false;
+
   DateTime? completedAt;
-  DateTime? date;
+
+  Task(this.text, this.todoDay);
+
+  Day get day {
+    if (fromCalendar) {
+      var date = calendarDate!.toLocal();
+      return Day(date.year, date.month, date.day);
+    } else {
+      return todoDay! <= Day.today() ? Day.today() : todoDay!;
+    }
+  }
 
   bool get done {
-    return completedAt != null || (fromCalendar && DateTime.now().millisecondsSinceEpoch > date!.millisecondsSinceEpoch);
+    return completedAt != null ||
+        (fromCalendar &&
+            DateTime.now().millisecondsSinceEpoch >
+                calendarDate!.millisecondsSinceEpoch);
   }
 
   bool get fromCalendar {
     return calendarId != null;
   }
 
-  Task(this.text);
-
-  factory Task.create() {
-    return Task('');
-  }
-
   Map<String, dynamic> toJson() {
     var map = {'text': text};
-    if (completedAt != null)
-      map['completedAt'] = completedAt!.toIso8601String();
-    if (date != null) map['date'] = date!.toIso8601String();
-    if (calendarId != null) map['calendarId'] = calendarId!;
+    if (fromCalendar) {
+      map['calendarId'] = calendarId!;
+      map['calendarDate'] = calendarDate!.toUtc().toIso8601String();
+      map['calendarAllDay'] = calendarAllDay.toString();
+    } else {
+      map['todoDay'] = todoDay.toString();
+      if (completedAt != null)
+        map['completedAt'] = completedAt!.toUtc().toIso8601String();
+    }
     return map;
   }
 
@@ -215,10 +295,12 @@ class Task {
     var calendarId = ics["uid"] as String;
     var text = ics["summary"] as String;
     var startsAt = ics["dtstart"] as DateTime;
+    var allDay = ics["dtstart_allday"] as bool;
 
-    var task = Task(text);
+    var task = Task(text, null);
     task.calendarId = calendarId;
-    task.date = startsAt;
+    task.calendarDate = startsAt;
+    task.calendarAllDay = allDay;
 
     return task;
   }
@@ -226,26 +308,71 @@ class Task {
   factory Task.fromJson(Map<String, dynamic> json) {
     var text = json["text"] as String;
     var calendarId = json["calendarId"] as String?;
-    var dateString = json["date"] as String?;
-    var completedAtString = json["completedAt"] as String?;
+    var calendarDate = json["calendarDate"] as String?;
+    var calendarAllDay = json["calendarAllDay"] as String?;
+    var todoDay = json["todoDay"] as String?;
+    var completedAt = json["completedAt"] as String?;
 
-    var task = Task(text);
-    if (calendarId != null) task.calendarId = calendarId;
-    if (dateString != null) task.date = DateTime.parse(dateString);
-    if (completedAtString != null)
-      task.completedAt = DateTime.parse(completedAtString);
+    var task = Task(text, null);
+    if (calendarId != null) {
+      task.calendarId = calendarId;
+      task.calendarAllDay = calendarAllDay!.toLowerCase() == 'true';
+      task.calendarDate = DateTime.parse(calendarDate!);
+    } else {
+      task.todoDay = Day.fromDate(DateTime.parse(todoDay!));
+      if (completedAt != null)
+        task.completedAt = DateTime.parse(completedAt).toLocal();
+    }
 
     return task;
   }
 }
 
 class Day {
-  DateTime date;
+  int year;
+  int month;
+  int day;
 
-  Day(this.date);
+  DateTime get date {
+    return DateTime(year, month, day);
+  }
 
-  int get daySince1970 {
-    return (date.millisecondsSinceEpoch / 1000 / 3600 / 24).floor();
+  Day(this.year, this.month, this.day);
+
+  factory Day.fromDate(DateTime date) {
+    var local = date.toLocal();
+    return Day(local.year, local.month, local.day);
+  }
+
+  factory Day.today() {
+    return Day.fromDate(DateTime.now());
+  }
+
+  String toString() {
+    var date = DateTime(year, month, day);
+    return date.toIso8601String().substring(0, 10);
+  }
+
+  bool operator <=(Day other) => this.compareTo(other) <= 0;
+
+  bool operator >=(Day other) => this.compareTo(other) >= 0;
+
+  bool operator <(Day other) => this.compareTo(other) < 0;
+
+  bool operator >(Day other) => this.compareTo(other) > 0;
+
+  bool operator ==(other) => other is Day && this.compareTo(other) == 0;
+
+  Day modified(int days) {
+    var date = DateTime(year, month, day);
+    var time = date.millisecondsSinceEpoch;
+    var newTime = time += days * 24 * 3600 * 1000;
+    var newDate = DateTime.fromMillisecondsSinceEpoch(newTime);
+    return Day(newDate.year, newDate.month, newDate.day);
+  }
+
+  int compareTo(Day other) {
+    return toString().compareTo(other.toString());
   }
 }
 
